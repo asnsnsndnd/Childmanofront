@@ -24,7 +24,7 @@ import { useGetUserQuery } from '../../Redux/User';
 import { useGetChildbyNameQuery } from '../../Redux/Childes';
 import { useGetUnreadMessageQuery } from '../../Redux/message';
 import { APi } from '../../Redux/CenteralAPI';
-import { socket } from './SocketIoConfig';
+
 import { useGetPermissionsOwnQuery } from '../../Redux/Employee';
 const DashbordNav = () => {
   // --- States ---
