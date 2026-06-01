@@ -1,6 +1,6 @@
 import { createAsyncThunk,createSlice } from "@reduxjs/toolkit";
-import { BASE_URL } from "../../../SocketIoConfig";
-const API_URL = BASE_URL ;
+
+const API_URL = import.meta.env.VITE_DEFAULT_BACKEND ;
 
 const initialState={
     id:null,

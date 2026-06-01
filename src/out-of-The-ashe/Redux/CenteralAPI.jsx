@@ -1,8 +1,8 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { BASE_URL } from '../../../SocketIoConfig';
+
 import { logout } from './auth';
 
-const API_URL = BASE_URL;
+const API_URL =import.meta.env.VITE_DEFAULT_BACKEND;
 
 // 1. Create the standard base query instance
 const baseQuery = fetchBaseQuery({
