@@ -6,8 +6,8 @@
   "main": "main.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && electron-builder",
-    "publish": "vite build && electron-builder --publish always",
+    "build": "vite build ",
+    "publish": "vite build ",
     "lint": "eslint .",
     "preview": "vite preview"
   },
