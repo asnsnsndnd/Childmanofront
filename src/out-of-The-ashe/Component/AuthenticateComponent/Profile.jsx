@@ -55,7 +55,7 @@ const Profile = () => {
     try {
       await updateUser({ id, ...formInfo }).unwrap();
       toast.success("Profile updated successfully!");
-      dispatch(APi.util.invalidateTags([{ type: 'User', id: 'List' }]));
+      dispatch(APi.util.invalidateTags([{ type: 'User', _id: 'List' }]));
       setIsEditing(false);
     } catch (err) {
       toast.error(err?.data?.msg || "Update failed");
@@ -84,7 +84,7 @@ const Profile = () => {
         autoClose: 3000 
       });
 
-      dispatch(APi.util.invalidateTags([{ type: 'User', id: 'List' }])); // Fixed _id to id mismatch here
+      dispatch(APi.util.invalidateTags([{ type: 'User', _id: 'List' }])); // Fixed _id to id mismatch here
     } catch (err) {
       // 3. Update toast to error state
       toast.update(toastId, { 
@@ -98,7 +98,7 @@ const Profile = () => {
 
   if (isFetching) return (
     <div className="flex flex-col items-center justify-center min-h-[400px]">
-      <div className="h-12 w-12 border-4 border-sky-500 rounded-full border-t-transparent animate-spin"></div>
+      <div className="h-12 w-12 border-4 border-primBtn rounded-full border-t-transparent animate-spin"></div>
       <p className="mt-4 text-slate-500 font-medium">Loading your profile...</p>
     </div>
   );
