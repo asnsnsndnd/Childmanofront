@@ -23,17 +23,7 @@ const App = () => {
   const { id } = useSelector((state) => state.auth)
   const Dispatch = useDispatch()
 
-  useEffect(() => {
-    if (id) {
-      socket.emit('join', id);
-      socket.on('onlineUser', (user) => {
-        Dispatch(updateOnlineUser(user));
-      })
-    }
-    return () => {
-      socket.off('onlineUser') // disconnect ሳይሆን onlineUserን አጥፋው
-    }
-  }, [id, Dispatch])
+ 
 
   return (
     <Router>
@@ -44,8 +34,7 @@ const App = () => {
         <Route path='/EmployeerRgister' element={<ProtectedRoute permission="employeeRegister"><EmployeeRegisterPage /></ProtectedRoute>} />
         <Route path='/ChildRegister' element={ <ProtectedRoute permission="childRegister"><RegisterChildPage /> </ProtectedRoute>} />
         <Route path='/ProfilePage' element={ <ProtectedRoute> <ProfilePage /> </ProtectedRoute>} />
-        <Route path='/MessagePage' element={<ProtectedRoute> <MessagePage /> </ProtectedRoute>} />
-        <Route path='/Notification' element={<ProtectedRoute> <NotificationPage /> </ProtectedRoute>} />
+      
         <Route path='/PasswordChange' element={<ProtectedRoute> <PasswordChangePage /> </ProtectedRoute>} />
         <Route path='/ChildSingle/:id' element={<ProtectedRoute> <ChildSinglePage /> </ProtectedRoute>} />
         <Route path='/EmployeeSingle/:id' element={ <ProtectedRoute><EmployeeSinglePage /> </ProtectedRoute>} />
