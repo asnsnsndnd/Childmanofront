@@ -10,7 +10,6 @@ const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const { id } = useSelector((state) => state.auth);
   
-  // ✅ 1. ስሙ በጃቫስክሪፕት ህግ መሰረት በትንሽ ፊደል 'dispatch' ቢሆን ይመረጣል
   const dispatch = useDispatch();
 
   const [UpdateProfile, { isLoading: isUploading }] = useUpdateProfileMutation();
@@ -33,34 +32,29 @@ const Profile = () => {
   };
 
   const handleSave = async () => {
-  
     if (!formInfo.firstName || formInfo.firstName.trim() === "") {
-       console.log("what happen")
-      toast.error(" first name must not empty");
+      toast.error("First name must not be empty");
       return;
     }
-     
     
     if (!formInfo.lastName || formInfo.lastName.trim()=== "") {
-      toast.error("lastname must not empty");
+      toast.error("Last name must not be empty");
       return;
     }
     
     if (!formInfo.phone || formInfo.phone.trim() === "") {
-      toast.error(" phone number must not empty");
+      toast.error("Phone number must not be empty");
       return;
     }
     
     if (!formInfo.educationBackground || formInfo.educationBackground.trim() === "") {
-      toast.error(" education background must not empty");
+      toast.error("Education background must not be empty");
       return;
     }
 
     try {
       await updateUser({ id, ...formInfo }).unwrap();
       toast.success("Profile updated successfully!");
-      
-      // ✅ 2. አሁን ከላይ ካለው 'dispatch' ጋር ተመሳሳይ ስለሆነ በትክክል ይሰራል
       dispatch(APi.util.invalidateTags([{ type: 'User', id: 'List' }]));
       setIsEditing(false);
     } catch (err) {
@@ -71,17 +65,34 @@ const Profile = () => {
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // 1. Create a promise-ready loader toast instance
+    const toastId = toast.loading("Uploading profile image...");
+
     const formData = new FormData();
     formData.append("id", id);
     formData.append("profile", file);
+
     try {
       await UpdateProfile(formData).unwrap();
-      toast.success("Profile picture updated!");
       
-      // ✅ 3. እዚህ ጋ የነበረውን '_id' ወደ 'id' አስተካክለነዋል (ከ handleSave ጋር አንድ አይነት እንዲሆን)
-      dispatch(APi.util.invalidateTags([{ type: 'User', _id: 'List' }]));
+      // 2. Update toast to success state
+      toast.update(toastId, { 
+        render: "Profile picture updated successfully!", 
+        type: "success", 
+        isLoading: false,
+        autoClose: 3000 
+      });
+
+      dispatch(APi.util.invalidateTags([{ type: 'User', id: 'List' }])); // Fixed _id to id mismatch here
     } catch (err) {
-      toast.error("Image upload failed");
+      // 3. Update toast to error state
+      toast.update(toastId, { 
+        render: err?.data?.msg || "Image upload failed", 
+        type: "error", 
+        isLoading: false, 
+        autoClose: 3000 
+      });
     }
   };
 
@@ -101,14 +112,25 @@ const Profile = () => {
         <div className="h-32 bg-gradient-to-r from-primBtn to-Hover/30 w-full" />
         <div className="px-8 pb-8 flex flex-col md:flex-row items-end -mt-16 gap-6">
           <div className="relative group">
-            <img
-              src={formInfo?.profile?.mediaurl || formInfo?.profile || "https://via.placeholder.com/150"}
-              alt="Profile"
-              className="w-40 h-40 rounded-[2.5rem] object-contain border-8 border-white shadow-lg bg-white"
-            />
+            <div className="relative w-40 h-40 rounded-[2.5rem] overflow-hidden border-8 border-white shadow-lg bg-white">
+              <img
+                src={formInfo?.profile?.mediaurl || formInfo?.profile || "https://via.placeholder.com/150"}
+                alt="Profile"
+                className="w-full h-full object-contain"
+              />
+              
+              {/* Profile Image Uploading Blur Layer */}
+              {isUploading && (
+                <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center">
+                  <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+
             <button 
               onClick={() => fileInputRef.current.click()}
-              className="absolute bottom-2 right-2 bg-primBtn text-white p-3 rounded-2xl shadow-xl hover:bg-Hover transition-all hover:scale-110 active:scale-95"
+              disabled={isUploading}
+              className="absolute bottom-2 right-2 bg-primBtn text-white p-3 rounded-2xl shadow-xl hover:bg-Hover transition-all hover:scale-110 active:scale-95 disabled:opacity-50 disabled:scale-100"
             >
               <FontAwesomeIcon icon={faCamera} />
             </button>
