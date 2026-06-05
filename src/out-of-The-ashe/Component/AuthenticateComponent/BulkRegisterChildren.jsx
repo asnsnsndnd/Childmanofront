@@ -2,70 +2,52 @@ import { useState, useRef, useCallback } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faFileExcel, faDownload, faTrash, faCheckCircle,
-  faExclamationTriangle, faSpinner, faUpload, faEye,
-  faChild, faTimesCircle, faEdit
+  faExclamationTriangle, faSpinner, faUpload,
+  faTimesCircle
 } from "@fortawesome/free-solid-svg-icons";
 import * as XLSX from "xlsx";
 import { ToastContainer, toast } from "react-toastify";
 import { useCreateChildMutation } from "../../Redux/Childes";
 
-// ─── Expected Excel columns (must match exactly, case-insensitive) ───────────
 const REQUIRED_COLUMNS = [
   "childFirstName", "childLastName", "childGrandFather",
- "childRegisterDate", "childBirthDay",
+  "childRegisterDate", "childBirthDay",
   "Grade", "gender", "ChildDescription",
 ];
 
 const OPTIONAL_COLUMNS = [
-  "childPhone","parentFirstName", "parentLastName", "parentPhone",
+  "childPhone", "parentFirstName", "parentLastName", "parentPhone",
   "parentrelation", "ParentDescription",
 ];
 
 const ALL_COLUMNS = [...REQUIRED_COLUMNS, ...OPTIONAL_COLUMNS];
 
-// ─── Parse any date value coming from Excel into a real JS Date ──────────────
-// Excel stores dates as serial numbers (e.g. 45292) OR JS Date objects (when
-// cellDates:true) OR plain strings like "2018-03-22" / "22/03/2018".
 const parseToDate = (value) => {
   if (!value && value !== 0) return null;
-
-  // Already a JS Date (SheetJS cellDates:true)
   if (value instanceof Date) {
     return isNaN(value.getTime()) ? null : value;
   }
-
-  // Excel serial number (number > 1 that isn't a timestamp in ms)
   if (typeof value === "number" && value > 1 && value < 2958466) {
-    // SheetJS serial → JS Date
     const date = XLSX.SSF.parse_date_code(value);
     if (date) return new Date(date.y, date.m - 1, date.d);
     return null;
   }
-
-  // String — try several common formats
   const str = String(value).trim();
   if (!str) return null;
-
-  // ISO: 2018-03-22  or  2018/03/22
   const isoMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
   if (isoMatch) {
     const d = new Date(+isoMatch[1], +isoMatch[2] - 1, +isoMatch[3]);
     return isNaN(d.getTime()) ? null : d;
   }
-
-  // DMY: 22/03/2018  or  22-03-2018
   const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
   if (dmyMatch) {
     const d = new Date(+dmyMatch[3], +dmyMatch[2] - 1, +dmyMatch[1]);
     return isNaN(d.getTime()) ? null : d;
   }
-
-  // Fallback: let the browser try
   const fallback = new Date(str);
   return isNaN(fallback.getTime()) ? null : fallback;
 };
 
-// ─── Format a Date → "YYYY-MM-DD" string for storage ─────────────────────────
 const formatDateISO = (date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -73,11 +55,8 @@ const formatDateISO = (date) => {
   return `${y}-${m}-${d}`;
 };
 
-// ─── Validate a single row ────────────────────────────────────────────────────
 const validateRow = (row) => {
   const errors = [];
-
-  // Required text fields
   REQUIRED_COLUMNS.forEach((col) => {
     if (!row[col] && row[col] !== 0) {
       errors.push(`"${col}" is required`);
@@ -85,17 +64,11 @@ const validateRow = (row) => {
       errors.push(`"${col}" must not be empty`);
     }
   });
-
-  // Gender check
   if (row.gender && !["male", "female"].includes(String(row.gender).toLowerCase())) {
     errors.push(`"gender" must be "male" or "female"`);
   }
-
-  // ── Date validation ────────────────────────────────────────────────────────
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
-  // childBirthDay: must be a real date, must be in the past
   if (row.childBirthDay || row.childBirthDay === 0) {
     const bd = parseToDate(row.childBirthDay);
     if (!bd) {
@@ -104,8 +77,6 @@ const validateRow = (row) => {
       errors.push(`"childBirthDay" must be a past date`);
     }
   }
-
-  // childRegisterDate: must be a real date, cannot be in the future
   if (row.childRegisterDate || row.childRegisterDate === 0) {
     const rd = parseToDate(row.childRegisterDate);
     if (!rd) {
@@ -114,19 +85,28 @@ const validateRow = (row) => {
       errors.push(`"childRegisterDate" cannot be a future date`);
     }
   }
-
   return errors;
 };
 
-// ─── Download template ────────────────────────────────────────────────────────
+// ── Template sample data matches ALL_COLUMNS order exactly ──────────────────
 const downloadTemplate = () => {
   const ws = XLSX.utils.aoa_to_sheet([
     ALL_COLUMNS,
     [
-      "Sara", "Ahmed", "Mohammed", "0912345678",
-      "2025-01-15", "2018-03-22", "Grade 2", "female",
-      "Healthy, active child",
-      "Fatuma", "Ahmed", "0911111111", "Mother", "Works nearby school",
+      "Sara",                  // childFirstName
+      "Ahmed",                 // childLastName
+      "Mohammed",              // childGrandFather
+      "2025-01-15",            // childRegisterDate
+      "2018-03-22",            // childBirthDay
+      "Grade 2",               // Grade
+      "female",                // gender
+      "Healthy, active child", // ChildDescription
+      "0912345678",            // childPhone
+      "Fatuma",                // parentFirstName
+      "Ahmed",                 // parentLastName
+      "0911111111",            // parentPhone
+      "Mother",                // parentrelation
+      "Works nearby school",   // ParentDescription
     ],
   ]);
   ws["!cols"] = ALL_COLUMNS.map(() => ({ wch: 20 }));
@@ -135,15 +115,14 @@ const downloadTemplate = () => {
   XLSX.writeFile(wb, "children_registration_template.xlsx");
 };
 
-// ─── Status badge ─────────────────────────────────────────────────────────────
 const StatusBadge = ({ status }) => {
   const map = {
-    pending:  { cls: "bg-slate-100 text-slate-500",   label: "Pending" },
-    valid:    { cls: "bg-emerald-50 text-emerald-600", label: "Valid" },
-    error:    { cls: "bg-rose-50 text-rose-600",       label: "Errors" },
-    loading:  { cls: "bg-sky-50 text-sky-600",         label: "Submitting…" },
-    success:  { cls: "bg-emerald-100 text-emerald-700 font-bold", label: "✓ Registered" },
-    failed:   { cls: "bg-rose-100 text-rose-700 font-bold",       label: "✗ Failed" },
+    pending: { cls: "bg-slate-100 text-slate-500",              label: "Pending" },
+    valid:   { cls: "bg-emerald-50 text-emerald-600",            label: "Valid" },
+    error:   { cls: "bg-rose-50 text-rose-600",                  label: "Errors" },
+    loading: { cls: "bg-sky-50 text-sky-600",                    label: "Submitting…" },
+    success: { cls: "bg-emerald-100 text-emerald-700 font-bold", label: "✓ Registered" },
+    failed:  { cls: "bg-rose-100 text-rose-700 font-bold",       label: "✗ Failed" },
   };
   const s = map[status] || map.pending;
   return (
@@ -153,16 +132,13 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
 const BulkRegisterChildren = () => {
-  const [rows, setRows] = useState([]);          // parsed + validated rows
+  const [rows, setRows]       = useState([]);
   const [dragging, setDragging] = useState(false);
-  const [expandedErrors, setExpandedErrors] = useState(null);
   const inputRef = useRef();
 
   const [createChild] = useCreateChildMutation();
 
-  // ── Parse Excel / CSV file ──────────────────────────────────────────────────
   const parseFile = useCallback((file) => {
     if (!file) return;
     const ext = file.name.split(".").pop().toLowerCase();
@@ -170,24 +146,20 @@ const BulkRegisterChildren = () => {
       toast.error("Please upload an .xlsx, .xls, or .csv file.");
       return;
     }
-
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const wb = XLSX.read(e.target.result, { type: "binary", cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json(ws, { defval: "" });
-
         if (raw.length === 0) { toast.warning("The file is empty."); return; }
 
-        // Normalise keys (trim whitespace)
         const normalised = raw.map((r) => {
           const out = {};
           Object.keys(r).forEach((k) => { out[k.trim()] = r[k]; });
           return out;
         });
 
-        // Check required columns exist
         const firstRow = normalised[0];
         const missing = REQUIRED_COLUMNS.filter((c) => !(c in firstRow));
         if (missing.length > 0) {
@@ -195,7 +167,6 @@ const BulkRegisterChildren = () => {
           return;
         }
 
-        // ── Normalise date fields → store as "YYYY-MM-DD" strings ──────────
         const withDates = normalised.map((row) => {
           const cleaned = { ...row };
           const bd = parseToDate(row.childBirthDay);
@@ -205,16 +176,9 @@ const BulkRegisterChildren = () => {
           return cleaned;
         });
 
-        // Validate each row
         const processed = withDates.map((row, i) => {
           const errors = validateRow(row);
-          return {
-            id: i,
-            data: row,
-            errors,
-            status: errors.length === 0 ? "valid" : "error",
-            serverMsg: "",
-          };
+          return { id: i, data: row, errors, status: errors.length === 0 ? "valid" : "error", serverMsg: "" };
         });
 
         setRows(processed);
@@ -232,15 +196,10 @@ const BulkRegisterChildren = () => {
   }, []);
 
   const onFileChange = (e) => parseFile(e.target.files[0]);
-  const onDrop = (e) => {
-    e.preventDefault(); setDragging(false);
-    parseFile(e.dataTransfer.files[0]);
-  };
+  const onDrop = (e) => { e.preventDefault(); setDragging(false); parseFile(e.dataTransfer.files[0]); };
 
-  // ── Remove a row ────────────────────────────────────────────────────────────
   const removeRow = (id) => setRows((prev) => prev.filter((r) => r.id !== id));
 
-  // ── Submit one row ──────────────────────────────────────────────────────────
   const submitRow = async (row) => {
     setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, status: "loading" } : r));
     const formData = new FormData();
@@ -257,12 +216,10 @@ const BulkRegisterChildren = () => {
     }
   };
 
-  // ── Submit all valid rows ────────────────────────────────────────────────────
   const submitAll = async () => {
     const toSubmit = rows.filter((r) => r.status === "valid");
     if (toSubmit.length === 0) { toast.warning("No valid rows to submit."); return; }
     toast.info(`Submitting ${toSubmit.length} children…`);
-    // Sequential to avoid rate limiting
     for (const row of toSubmit) await submitRow(row);
     toast.success("Batch submission complete!");
   };
@@ -270,7 +227,6 @@ const BulkRegisterChildren = () => {
   const validCount   = rows.filter((r) => r.status === "valid").length;
   const errorCount   = rows.filter((r) => r.status === "error").length;
   const successCount = rows.filter((r) => r.status === "success").length;
-  const failedCount  = rows.filter((r) => r.status === "failed").length;
 
   return (
     <div className="max-w-6xl mx-auto animate-in fade-in duration-700 pb-10">
@@ -323,10 +279,10 @@ const BulkRegisterChildren = () => {
         {rows.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: "Total",     val: rows.length,   cls: "bg-slate-100 text-slate-700" },
-              { label: "Valid",     val: validCount,     cls: "bg-emerald-50 text-emerald-700" },
-              { label: "Errors",    val: errorCount,     cls: "bg-rose-50 text-rose-700" },
-              { label: "Registered",val: successCount,   cls: "bg-sky-50 text-sky-700" },
+              { label: "Total",      val: rows.length,  cls: "bg-slate-100 text-slate-700" },
+              { label: "Valid",      val: validCount,   cls: "bg-emerald-50 text-emerald-700" },
+              { label: "Errors",     val: errorCount,   cls: "bg-rose-50 text-rose-700" },
+              { label: "Registered", val: successCount, cls: "bg-sky-50 text-sky-700" },
             ].map(({ label, val, cls }) => (
               <div key={label} className={`${cls} rounded-2xl p-4 flex flex-col items-center`}>
                 <span className="text-3xl font-black">{val}</span>
@@ -355,7 +311,16 @@ const BulkRegisterChildren = () => {
                 <tbody className="divide-y divide-slate-100">
                   {rows.map((row, i) => (
                     <>
-                      <tr key={row.id} className={`transition-colors ${row.status === "success" ? "bg-emerald-50/40" : row.status === "failed" ? "bg-rose-50/40" : "hover:bg-slate-50"}`}>
+                      {/* ── Main data row ── */}
+                      <tr
+                        key={row.id}
+                        className={`transition-colors ${
+                          row.status === "success"    ? "bg-emerald-50/40" :
+                          row.status === "failed"     ? "bg-rose-50/40" :
+                          row.errors.length > 0       ? "bg-rose-50/30" :
+                          "hover:bg-slate-50"
+                        }`}
+                      >
                         <td className="px-4 py-3 text-slate-400 font-mono text-xs">{i + 1}</td>
                         <td className="px-4 py-3 font-semibold text-slate-800 whitespace-nowrap">
                           {row.data.childFirstName} {row.data.childLastName}
@@ -377,17 +342,6 @@ const BulkRegisterChildren = () => {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            {/* Show errors */}
-                            {row.errors.length > 0 && (
-                              <button
-                                onClick={() => setExpandedErrors(expandedErrors === row.id ? null : row.id)}
-                                title="View errors"
-                                className="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 hover:bg-amber-200 flex items-center justify-center transition-colors"
-                              >
-                                <FontAwesomeIcon icon={faExclamationTriangle} size="xs" />
-                              </button>
-                            )}
-                            {/* Retry individual */}
                             {(row.status === "valid" || row.status === "failed") && (
                               <button
                                 onClick={() => submitRow(row)}
@@ -402,7 +356,6 @@ const BulkRegisterChildren = () => {
                                 <FontAwesomeIcon icon={faSpinner} spin className="text-sky-500 text-xs" />
                               </div>
                             )}
-                            {/* Delete row */}
                             {row.status !== "loading" && row.status !== "success" && (
                               <button
                                 onClick={() => removeRow(row.id)}
@@ -416,16 +369,21 @@ const BulkRegisterChildren = () => {
                         </td>
                       </tr>
 
-                      {/* Expanded error row */}
-                      {expandedErrors === row.id && (
-                        <tr key={`err-${row.id}`} className="bg-rose-50">
-                          <td colSpan={7} className="px-6 py-3">
-                            <p className="text-xs font-bold text-rose-700 mb-1">Validation errors:</p>
-                            <ul className="list-disc list-inside space-y-1">
+                      {/* ── Inline error chips — always visible when errors exist ── */}
+                      {row.errors.length > 0 && (
+                        <tr key={`err-${row.id}`} className="bg-rose-50 border-b-2 border-rose-200">
+                          <td colSpan={7} className="px-6 pb-3 pt-1">
+                            <div className="flex flex-wrap gap-2">
                               {row.errors.map((e, ei) => (
-                                <li key={ei} className="text-xs text-rose-600">{e}</li>
+                                <span
+                                  key={ei}
+                                  className="inline-flex items-center gap-1.5 text-xs bg-white border border-rose-300 text-rose-600 px-2.5 py-1 rounded-lg"
+                                >
+                                  <FontAwesomeIcon icon={faExclamationTriangle} className="text-rose-400 text-[10px]" />
+                                  {e}
+                                </span>
                               ))}
-                            </ul>
+                            </div>
                           </td>
                         </tr>
                       )}
@@ -461,7 +419,7 @@ const BulkRegisterChildren = () => {
           </>
         )}
 
-        {/* ── Column guide (collapsed hint) ── */}
+        {/* ── Column guide ── */}
         <details className="rounded-2xl border border-slate-200 overflow-hidden">
           <summary className="px-5 py-4 cursor-pointer font-bold text-slate-600 text-sm bg-slate-50 hover:bg-slate-100 transition-colors list-none flex items-center justify-between">
             <span>📋 Required Excel column names</span>
